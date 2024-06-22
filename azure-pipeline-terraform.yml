@@ -2,6 +2,8 @@
 ## Pre-requisite
   # Terraform Code is pushed on Azure Repos
   # This pipeline considers the Terraform Code to be present on same git repo as this pipeline yaml file
+  # Create a Service Connection to Azure Account with name Azure-Account-Service-Connection
+  # Update the terraform init tasks with the Storage Account details where .tfstate file will be managed
 
 trigger:
   - main
@@ -25,7 +27,6 @@ jobs:
 
   - task: TerraformTaskV4@4
     displayName: 'Terraform Init'
-    enabled: false
     inputs:
       provider: 'azurerm'
       command: 'init'
@@ -38,7 +39,6 @@ jobs:
 
   - task: TerraformTaskV4@4
     displayName: 'Terraform Plan'
-    enabled: false
     inputs:
       provider: 'azurerm'
       command: 'plan'
@@ -51,15 +51,12 @@ jobs:
   displayName: 'Manual Review (Recepients Notified via Email)'
   dependsOn: TerraformPlan
   pool: server
-  timeoutInMinutes: 4320
   steps:
   - task: ManualValidation@0
-    timeoutInMinutes: 1440 # task times out in 1 day
     inputs:
       notifyUsers: |
         laveshsp@gmail.com
-        lavesh.shankarlal@accenture.com
-      instructions: 'Please validate the build configuration and resume'
+      instructions: 'Please validate the Terraform Plan task and review the infra changes'
       onTimeout: 'resume'
 
 
@@ -77,7 +74,6 @@ jobs:
 
   - task: TerraformTaskV4@4
     displayName: 'Terraform Init'
-    enabled: false
     inputs:
       provider: 'azurerm'
       command: 'init'
@@ -90,7 +86,6 @@ jobs:
 
   - task: TerraformTaskV4@4
     displayName: 'Terraform Apply'
-    enabled: false
     inputs:
       provider: 'azurerm'
       command: 'apply'
