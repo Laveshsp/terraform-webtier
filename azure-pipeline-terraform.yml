@@ -1,0 +1,99 @@
+## This is a Azure DevOps Pipeline.
+## Pre-requisite
+  # Terraform Code is pushed on Azure Repos
+  # This pipeline considers the Terraform Code to be present on same git repo as this pipeline yaml file
+
+trigger:
+  - main
+  - master
+
+variables:
+  - name: vm_uname
+    value: $(vm_uname_sensitive)
+
+jobs:
+
+- job: TerraformPlan
+  displayName: 'Terraform Plan'
+  pool:
+    vmImage: ubuntu-latest
+  steps:
+  - task: TerraformInstaller@1
+    displayName: 'Install Terraform'
+    inputs:
+      terraformVersion: 'latest'
+
+  - task: TerraformTaskV4@4
+    displayName: 'Terraform Init'
+    enabled: false
+    inputs:
+      provider: 'azurerm'
+      command: 'init'
+      workingDirectory: '$(System.DefaultWorkingDirectory)/infra-env/poc/webtier/'
+      backendServiceArm: 'Azure-Account-Service-Connection'
+      backendAzureRmResourceGroupName: 'RGName'
+      backendAzureRmStorageAccountName: 'AzStorageAccountName'
+      backendAzureRmContainerName: 'AzStorageContainerName'
+      backendAzureRmKey: 'terraform.tfstate'
+
+  - task: TerraformTaskV4@4
+    displayName: 'Terraform Plan'
+    enabled: false
+    inputs:
+      provider: 'azurerm'
+      command: 'plan'
+      workingDirectory: '$(System.DefaultWorkingDirectory)/infra-env/poc/webtier/'
+      commandOptions: '-out=tfplan -var "vm_uname=$(vm_uname)"'
+      environmentServiceNameAzureRM: 'Azure-Account-Service-Connection'
+      
+
+- job: ManualReview
+  displayName: 'Manual Review (Recepients Notified via Email)'
+  dependsOn: TerraformPlan
+  pool: server
+  timeoutInMinutes: 4320
+  steps:
+  - task: ManualValidation@0
+    timeoutInMinutes: 1440 # task times out in 1 day
+    inputs:
+      notifyUsers: |
+        laveshsp@gmail.com
+        lavesh.shankarlal@accenture.com
+      instructions: 'Please validate the build configuration and resume'
+      onTimeout: 'resume'
+
+
+- job: TerraformApply
+  displayName: 'Terraform Apply'
+  pool:
+    vmImage: ubuntu-latest
+  dependsOn: ManualReview
+  steps:
+   
+  - task: TerraformInstaller@1
+    displayName: 'Install Terraform'
+    inputs:
+      terraformVersion: 'latest'
+
+  - task: TerraformTaskV4@4
+    displayName: 'Terraform Init'
+    enabled: false
+    inputs:
+      provider: 'azurerm'
+      command: 'init'
+      workingDirectory: '$(System.DefaultWorkingDirectory)/infra-env/poc/webtier/'
+      backendServiceArm: 'Azure-Account-Service-Connection'
+      backendAzureRmResourceGroupName: 'RGName'
+      backendAzureRmStorageAccountName: 'AzStorageAccountName'
+      backendAzureRmContainerName: 'AzStorageContainerName'
+      backendAzureRmKey: 'terraform.tfstate'
+
+  - task: TerraformTaskV4@4
+    displayName: 'Terraform Apply'
+    enabled: false
+    inputs:
+      provider: 'azurerm'
+      command: 'apply'
+      workingDirectory: '$(System.DefaultWorkingDirectory)/infra-env/poc/webtier/'
+      commandOptions: '-auto-approve -var "vm_uname=$(vm_uname)"'
+      environmentServiceNameAzureRM: 'Azure-Account-Service-Connection'
